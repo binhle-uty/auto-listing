@@ -82,7 +82,7 @@ def execute(df, at_index):
             if st.button("BẮT ĐẦU XỬ LÝ", key="exe_button"):
                 df = df.rename(columns=feature_map)
                 df['sys_run_date'] = datetime.now()
-                df['id'] = df['id'] + at_index
+                df['id'] = range(1, len(df)+1) + at_index
                 df = df[headers]
                 st.success(f"Preprocess data")
                 save_to_supabase(df)
