@@ -18,18 +18,25 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1avXZgp1DIg7weP9GbDRrOH-T4SKvrfX-oJW4HE73aQE/export?format=csv&gid=0"
 
-feature_map = {     'STT':'id',
-                    'Tên':'title',
+feature_map = {    'STT':'id',
+                    'Tên':'name',
                    'CUSTOMERS':'customer',
                    'Asin liên quan':'asin',
-                   'NGÀY':'insert_date',}
-headers = [
-            "id",
-            "sys_run_date",
-            "asin",
-            "title",
+                   'NGÀY':'insert_date',
+                   'Pack':'pack',
+                   'Organic Keywords':'organic_keywords',
+                   'Auto Keywords': 'keyword',
+                   }
+headers = [ "id",
+            "sys_run_date",  
+           "asin",
+             "name",
             "customer",
             "insert_date",
+            "keyword",
+            "pack",
+            "session_id",
+            "organic_keywords",   
         ]
 
 def set_page_info():
@@ -59,7 +66,7 @@ def save_to_supabase(row):
     table = "auto_listing_table"
     row = row[headers].copy()
     row["sys_run_date"] = row["sys_run_date"].apply(lambda x: x.strftime("%Y-%m-%d %H:%M:%S"))
-    
+    st.write(row)
     try:
         # Convert rows to list of dictionaries and handle NaN values
         rows_list = row.replace({np.nan: None}).to_dict(orient="records")
@@ -71,18 +78,19 @@ def save_to_supabase(row):
         )
         if hasattr(response, "error") and response.error is not None:
             raise Exception(f"Error inserting rows: {response.error}")
-        st.success(f"Rows inserted successfully")
+        st.success(f"Rows inserted successfully to Database")
     except Exception as e:
         st.error(f"Error with rows: {e}")
 
 
-def execute(df, at_index):
+def execute(df, at_index, at_session):
     with st.container():
         if len(df)!=0:
             if st.button("BẮT ĐẦU XỬ LÝ", key="exe_button"):
                 df = df.rename(columns=feature_map)
                 df['sys_run_date'] = datetime.now()
                 df['id'] = range(1, len(df)+1) + at_index
+                df['session_id'] = "session_" +  str(at_session + 1)
                 df = df[headers]
                 st.success(f"Preprocess data")
                 save_to_supabase(df)
@@ -124,10 +132,12 @@ def load_google_data():
     with st.spinner('Wait for it...'):
         df = read_doc()
         df['NGÀY'] = df["NGÀY"].apply(convert_datetime)
+    
+    if 'CHECK' in df.columns:
+        df = df.drop(columns=['CHECK'])
     st.success('DATA LOADED!', icon="✅")
     st.empty()
     return df
-
 
 
 if __name__ == '__main__':
@@ -135,7 +145,9 @@ if __name__ == '__main__':
     set_page_info()
     df = pd.DataFrame()
     list_asin, df_existed = fetch_existing_asin_main()
+    st.write(df_existed)
     at_index = df_existed['id'].max()
+    at_session = int(df_existed['session_id'].tail(1).values[0].split('session_')[1])
     
     toggle = st.toggle("Upload file để tự động hoá?")
 
@@ -149,4 +161,4 @@ if __name__ == '__main__':
     if len(df)!=0:
         st.dataframe(df)
 
-    execute(df, at_index)
+    execute(df, at_index, at_session)
